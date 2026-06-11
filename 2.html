@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Baltazar — شاشة الساندويش والسلطة</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;800;900&family=Cairo:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0c0c0c; --bg2:#161616; --surface:#1b1b1b; --card:#1f1f1f; --card2:#262626;
+  --accent:#e8310a; --accent2:#ff6b3d; --gold:#f5c842; --green:#2bd66a; --red:#ff4d4d;
+  --text:#f1ece2; --muted:#9a948a; --border:#2c2c2c;
+  --gap:1.05rem;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html{font-size:16px;}
+body{
+  font-family:'Cairo',Tahoma,Arial,sans-serif;
+  background:radial-gradient(120% 90% at 50% -10%, #1d1d1d 0%, var(--bg) 60%), var(--bg);
+  color:var(--text); width:100vw;height:100vh;overflow:hidden;cursor:none;
+  display:flex;align-items:center;justify-content:center;
+}
+img{display:block;}
+
+/* ── BOARD (perfect 16:9, JS-scaled) ── */
+.board{position:relative;width:120rem;height:67.5rem;display:flex;flex-direction:column;
+  padding:1.5rem 2rem 0;overflow:hidden;background:linear-gradient(180deg,#121212,#0d0d0d);}
+.board::after{content:"";position:absolute;inset:0;pointer-events:none;z-index:1;
+  background:radial-gradient(140% 120% at 50% 0%, transparent 52%, rgba(0,0,0,.6) 100%);}
+
+/* ── ANIMATED FOOD BACKGROUND ── */
+.food-bg{position:absolute;inset:0;z-index:0;overflow:hidden;pointer-events:none;}
+.fb-emoji{position:absolute;opacity:.08;will-change:transform;
+  animation-name:floaty;animation-timing-function:ease-in-out;animation-iteration-count:infinite;
+  filter:drop-shadow(0 0 1px rgba(0,0,0,.4));}
+@keyframes floaty{
+  0%{transform:translate(0,0) rotate(0deg);}
+  50%{transform:translate(var(--dx,20px),var(--dy,-34px)) rotate(var(--rot,20deg));}
+  100%{transform:translate(0,0) rotate(0deg);}
+}
+
+/* ── HEADER ── */
+.topbar{position:relative;z-index:3;display:flex;align-items:center;justify-content:space-between;gap:1.5rem;}
+.status{display:flex;flex-direction:column;align-items:flex-start;gap:.3rem;min-width:11rem;}
+.clock{font-family:'Playfair Display',serif;font-weight:800;font-size:2rem;color:#fbf7ef;line-height:1;letter-spacing:.05rem;}
+.net{display:flex;align-items:center;gap:.45rem;font-size:.86rem;font-weight:700;color:var(--muted);}
+.net .dot{width:.72rem;height:.72rem;border-radius:50%;background:var(--red);box-shadow:0 0 .5rem var(--red);transition:all .3s;}
+.net.on .dot{background:var(--green);box-shadow:0 0 .55rem var(--green);}
+.net.on .lbl{color:var(--green);}
+
+.board-head-mid{text-align:center;}
+.board-title{display:flex;align-items:baseline;justify-content:center;gap:.7rem;line-height:1;}
+.board-title .ar{font-family:'Cairo',sans-serif;font-weight:900;font-size:2.5rem;
+  background:linear-gradient(180deg,#fff,var(--gold));-webkit-background-clip:text;background-clip:text;color:transparent;}
+.board-title .en{font-family:'Playfair Display',serif;font-weight:800;font-size:2.1rem;color:var(--accent2);letter-spacing:.06rem;}
+.board-title .mid{font-size:1.6rem;color:var(--accent);transform:translateY(-.1rem);}
+.title-rule{height:.2rem;width:14rem;margin:.55rem auto 0;border-radius:2px;
+  background:linear-gradient(90deg,transparent,var(--gold) 30%,var(--accent) 70%,transparent);
+  background-size:200% 100%;animation:sweep 6s linear infinite;}
+@keyframes sweep{to{background-position:200% 0;}}
+
+.brandname{min-width:11rem;text-align:left;font-family:'Playfair Display',serif;font-weight:900;
+  font-size:2.05rem;letter-spacing:.06rem;line-height:1.05;
+  background:linear-gradient(120deg,var(--gold) 0%,#fff 35%,var(--accent2) 70%,var(--accent) 100%);
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+  text-shadow:0 .15rem .7rem rgba(232,49,10,.25);}
+.brandname span{display:block;font-size:1rem;letter-spacing:.5rem;font-weight:800;
+  -webkit-text-fill-color:var(--muted);color:var(--muted);background:none;margin-top:.1rem;}
+
+/* ── STAGE / FIT AREA ── */
+.stage{position:relative;z-index:3;flex:1;min-height:0;margin-top:1rem;display:flex;}
+body[data-screen="screen1"] .stage{margin-top:2.7rem;}
+.fit-wrap{flex:1;min-height:0;overflow:hidden;display:flex;justify-content:center;}
+.grid{display:grid;gap:var(--gap);align-content:start;width:100%;transform-origin:top center;}
+.cols2{grid-template-columns:repeat(2,1fr);}
+.cols3{grid-template-columns:repeat(3,1fr);}
+.cols4{grid-template-columns:repeat(4,1fr);}
+
+/* ── CARDS ── */
+.card{display:flex;gap:.85rem;background:linear-gradient(180deg,var(--card),#1a1a1a);
+  border:1px solid var(--border);border-radius:1rem;padding:.8rem;overflow:hidden;
+  box-shadow:0 .4rem 1rem rgba(0,0,0,.35);}
+.card .media{width:6rem;height:6rem;flex-shrink:0;border-radius:.7rem;overflow:hidden;background:var(--card2);
+  display:flex;align-items:center;justify-content:center;font-size:3.1rem;}
+.card .media img{width:100%;height:100%;object-fit:cover;}
+.card .info{flex:1;min-width:0;display:flex;flex-direction:column;}
+.names{display:flex;align-items:baseline;gap:.5rem;flex-wrap:wrap;}
+.name-en{font-family:'Playfair Display',serif;font-weight:800;font-size:1.35rem;color:#fbf7ef;line-height:1.05;}
+.name-ar{font-weight:700;font-size:1.02rem;color:var(--accent2);}
+.ingredients{font-size:.9rem;line-height:1.45;color:var(--muted);margin-top:.28rem;}
+.sauces{font-size:.78rem;color:var(--green);font-weight:700;margin-top:.32rem;}
+.sauces b{color:var(--text);}
+.sizes{display:flex;flex-wrap:wrap;gap:.45rem;margin-top:auto;padding-top:.5rem;}
+.pill{display:flex;align-items:center;gap:.45rem;background:var(--card2);border:1px solid var(--border);
+  border-radius:2rem;padding:.3rem .85rem;font-size:.95rem;font-weight:700;color:var(--text);}
+.pill .p{font-family:'Playfair Display',serif;font-weight:900;color:var(--gold);font-size:1.35rem;
+  text-shadow:0 0 .5rem rgba(245,200,66,.4);letter-spacing:.02rem;}
+
+/* section divider inside food grid */
+.cap-row{grid-column:1/-1;display:flex;align-items:baseline;gap:.7rem;margin:.3rem 0 .1rem;}
+.cap-row .en{font-family:'Playfair Display',serif;font-weight:800;font-size:1.4rem;color:var(--accent);}
+.cap-row .ar{font-weight:800;font-size:1.15rem;color:var(--text);}
+.cap-row .line{flex:1;height:1px;background:linear-gradient(90deg,var(--border),transparent);}
+
+/* ── FADE ROTATOR (extras + offers appear one after another) ── */
+.ticker{position:relative;z-index:3;flex-shrink:0;height:5rem;margin:.7rem -2rem 0;
+  display:flex;align-items:center;justify-content:center;overflow:hidden;white-space:nowrap;
+  background:linear-gradient(90deg,#1a0f0c,#2c1611,#3c1c11,#2c1611,#1a0f0c);
+  background-size:220% 100%;animation:tkbg 9s linear infinite;
+  border-top:2px solid var(--accent);
+  box-shadow:inset 0 0 2.2rem rgba(232,49,10,.28), 0 -.3rem 1rem rgba(0,0,0,.45);}
+@keyframes tkbg{to{background-position:220% 0;}}
+.ticker::before{content:"";position:absolute;top:0;left:0;right:0;height:.18rem;z-index:2;
+  background:linear-gradient(90deg,transparent,var(--gold),var(--accent),var(--gold),transparent);
+  background-size:45% 100%;animation:tksheen 3.2s linear infinite;}
+@keyframes tksheen{to{background-position:240% 0;}}
+.tk-slide{display:inline-flex;align-items:center;gap:.7rem;
+  font-size:1.5rem;font-weight:800;color:var(--text);
+  opacity:0;transform:translateY(.75rem) scale(.97);
+  transition:opacity .6s ease, transform .6s cubic-bezier(.2,.85,.25,1);}
+.tk-slide.show{opacity:1;transform:translateY(0) scale(1);}
+.tk-h{font-family:'Cairo',sans-serif;font-weight:900;font-size:1.45rem;padding:.2rem 1.05rem;border-radius:.7rem;
+  margin-left:.3rem;animation:tkpulse 1.5s ease-in-out infinite;}
+.tk-h.ex{color:#fff;background:linear-gradient(135deg,var(--accent),var(--accent2));box-shadow:0 0 .9rem rgba(232,49,10,.75);}
+.tk-h.of{color:#1a1714;background:linear-gradient(135deg,var(--gold),#ffd766);box-shadow:0 0 .9rem rgba(245,200,66,.75);}
+@keyframes tkpulse{0%,100%{transform:scale(1);}50%{transform:scale(1.08);}}
+.tk-p{font-family:'Playfair Display',serif;font-weight:900;color:var(--gold);font-size:1.7rem;margin:0 .3rem;
+  text-shadow:0 0 .8rem rgba(245,200,66,.6);}
+.tk-sub{color:var(--muted);font-weight:700;font-size:1.15rem;}
+.ticker.hide{display:none;}
+
+/* ── SAUCE NOTE (pizza page only) ── */
+.sauce-note{display:none;flex-shrink:0;margin:.6rem 0 0;}
+body[data-screen="screen1"] .sauce-note{display:flex;}
+.sauce-note .chip{margin-inline-start:auto;display:inline-flex;align-items:center;gap:.55rem;
+  font-weight:800;font-size:1.2rem;color:var(--gold);letter-spacing:.02rem;
+  background:rgba(245,200,66,.09);border:1.6px solid rgba(245,200,66,.5);
+  padding:.42rem 1.2rem;border-radius:2rem;box-shadow:0 0 .9rem rgba(245,200,66,.18);
+  animation:sauceGlow 2.4s ease-in-out infinite;}
+@keyframes sauceGlow{0%,100%{box-shadow:0 0 .7rem rgba(245,200,66,.15);}50%{box-shadow:0 0 1.4rem rgba(245,200,66,.4);}}
+
+.empty{color:var(--muted);font-size:1.2rem;text-align:center;padding:3rem;width:100%;}
+</style>
+</head>
+<body>
+<div class="board">
+
+  <!-- animated food background -->
+  <div class="food-bg" id="foodBg"></div>
+
+  <!-- HEADER -->
+  <header class="topbar">
+    <div class="status">
+      <div class="clock" id="clock">--:--</div>
+      <div class="net" id="net"><span class="dot"></span><span class="lbl" id="netLbl">بدون اتصال</span></div>
+    </div>
+    <div class="board-head-mid">
+      <div class="board-title" id="boardTitle"></div>
+      <div class="title-rule"></div>
+    </div>
+    <div class="brandname">Baltazar<span>PIZZERIA 🇸🇪</span></div>
+  </header>
+
+  <!-- STAGE -->
+  <div class="stage"><div class="fit-wrap" id="fitWrap"></div></div>
+
+  <!-- SAUCE NOTE (pizza page only, left side, above ticker) -->
+  <div class="sauce-note" id="sauceNote"><span class="chip">🥫 اختر صلصتك عند الطلب · Choose your sauce</span></div>
+
+  <!-- ROTATING OFFERS/EXTRAS (fade in/out) -->
+  <div class="ticker" id="ticker"><div class="tk-slide" id="tkSlide"></div></div>
+
+</div>
+
+<script>
+/* ════════════════════════════════════════════════════════════════
+   BALTAZAR PIZZERIA · TV MENU BOARD
+   MODE 'screen1' = البيتزا   |   MODE 'screen2' = ساندويش وسلطة
+   • Offline-first (localStorage cache) + live Firebase, self-healing.
+   • All items fit on one screen (auto scale-to-fit, no paging).
+   • Extras + Offers scroll in the bottom ticker. Drinks removed.
+════════════════════════════════════════════════════════════════ */
+var MODE='screen2';
+var CACHE_KEY='baltazar_menu_cache_v1';
+var firebaseConfig={
+  apiKey:"AIzaSyAhvlZ4sMfArWR-m7pCSZMKDV3Jh2T3v8o",
+  authDomain:"baltazar-pizzeria.firebaseapp.com",
+  databaseURL:"https://baltazar-pizzeria-default-rtdb.firebaseio.com",
+  projectId:"baltazar-pizzeria",
+  storageBucket:"baltazar-pizzeria.firebasestorage.app",
+  messagingSenderId:"1084908313025",
+  appId:"1:1084908313025:web:dfb639dac9171561cff740"
+};
+
+function $(id){return document.getElementById(id);}
+function fmt(n){return Number(n||0).toLocaleString('en-US');}
+function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+function ingredientsOf(it){
+  return it.ingredientsAr||it.ingredients||it.mukawinat||it.componentsAr||it.components||
+         it.descAr||it.desc||it.detailsAr||it.details||'';
+}
+function sizeName(n){ return String(n==null?'':n).replace(/\bregular\b/ig,'').replace(/\s+/g,' ').trim(); }
+function pills(it){
+  return (it.sizes||[]).map(function(s){
+    var nm=sizeName(s.n);
+    return '<span class="pill">'+(nm?esc(nm)+' ':'')+'<span class="p">'+fmt(s.p)+'</span></span>';
+  }).join('');
+}
+
+/* perfect-fit scaling for any 16:9 TV */
+function setScale(){
+  var s=Math.min(window.innerWidth/1920, window.innerHeight/1080);
+  document.documentElement.style.fontSize=(16*s)+'px';
+}
+window.addEventListener('resize',function(){setScale();fit();});
+
+/* clock */
+function tickClock(){
+  var d=new Date(),h=d.getHours(),m=d.getMinutes();
+  var ap=h<12?'AM':'PM',hh=h%12; if(hh===0)hh=12;
+  $('clock').textContent=hh+':'+(m<10?'0':'')+m+' '+ap;
+}
+setInterval(tickClock,1000);
+
+/* online / offline */
+var _hasData=false;
+function setOnline(on){
+  $('net').classList.toggle('on',!!on);
+  $('netLbl').textContent=on?'متصل · مباشر':'بدون اتصال';
+}
+
+/* ── animated food background ── */
+function buildFoodBg(){
+  var bg=$('foodBg'); bg.innerHTML='';
+  var set = MODE==='screen1' ? ['🍕','🍅','🧀','🌶️','🫒','🍕','🔥'] : ['🥪','🥗','🥖','🥬','🍅','🥒','🧀'];
+  for(var i=0;i<16;i++){
+    var s=document.createElement('span'); s.className='fb-emoji';
+    s.textContent=set[i%set.length];
+    s.style.fontSize=(2.2+Math.random()*4.5)+'rem';
+    s.style.left=(Math.random()*98)+'%';
+    s.style.top=(Math.random()*96)+'%';
+    var dur=18+Math.random()*24;
+    s.style.animationDuration=dur+'s';
+    s.style.animationDelay=(-Math.random()*dur)+'s';
+    s.style.setProperty('--dx',((Math.random()*2-1)*40)+'px');
+    s.style.setProperty('--dy',(-20-Math.random()*40)+'px');
+    s.style.setProperty('--rot',((Math.random()*2-1)*45)+'deg');
+    bg.appendChild(s);
+  }
+}
+
+/* ── card builders ── */
+function pizzaCard(it){
+  var c=document.createElement('div'); c.className='card';
+  var media=it.img
+    ?'<div class="media"><img src="'+esc(it.img)+'" loading="lazy" onerror="this.parentNode.textContent=\''+(it.emoji||'🍕')+'\'"></div>'
+    :'<div class="media">'+(it.emoji||'🍕')+'</div>';
+  var ing=ingredientsOf(it);
+  var sizes=pills(it);
+  c.innerHTML=media+'<div class="info"><div class="names"><span class="name-en">'+esc(it.name||'')+'</span>'+
+    (it.nameAr?'<span class="name-ar">'+esc(it.nameAr)+'</span>':'')+'</div>'+
+    (ing?'<div class="ingredients">'+esc(ing)+'</div>':'')+
+    '<div class="sizes">'+sizes+'</div></div>';
+  return c;
+}
+function foodCard(it){
+  var c=document.createElement('div'); c.className='card';
+  var media=it.img
+    ?'<div class="media"><img src="'+esc(it.img)+'" loading="lazy" onerror="this.parentNode.textContent=\''+(it.emoji||'🍽️')+'\'"></div>'
+    :'<div class="media">'+(it.emoji||'🍽️')+'</div>';
+  var ing=ingredientsOf(it);
+  var sizes=pills(it);
+  c.innerHTML=media+'<div class="info"><div class="names"><span class="name-en">'+esc(it.name||'')+'</span>'+
+    (it.nameAr?'<span class="name-ar">'+esc(it.nameAr)+'</span>':'')+'</div>'+
+    (ing?'<div class="ingredients">'+esc(ing)+'</div>':'')+
+    '<div class="sizes">'+sizes+'</div></div>';
+  return c;
+}
+function capRow(en,ar){
+  var d=document.createElement('div'); d.className='cap-row';
+  d.innerHTML='<span class="en">'+esc(en)+'</span><span class="ar">'+esc(ar)+'</span><span class="line"></span>';
+  return d;
+}
+
+/* ── scale-to-fit (no paging) ── */
+function fit(){
+  var wrap=$('fitWrap'); if(!wrap)return;
+  var grid=wrap.querySelector('.grid'); if(!grid)return;
+  grid.style.transform='none';
+  var availH=wrap.clientHeight||1, ch=grid.scrollHeight;
+  var scale=ch>availH?Math.max(0.42, availH/ch):1;
+  grid.style.transform=scale<1?'scale('+scale+')':'none';
+}
+
+/* ── ROTATOR: extras + offers appear one after another (fade/slide) ── */
+var _slides=[], _tkIdx=0, _tkTimer=null;
+function buildTicker(menu){
+  _slides=[];
+  (menu.extras||[]).forEach(function(it){
+    var p=(it.sizes&&it.sizes[0])?it.sizes[0].p:(it.price||0);
+    var nm=(it.emoji?it.emoji+' ':'')+esc(it.name||'')+(it.nameAr?' '+esc(it.nameAr):'');
+    _slides.push('<span class="tk-h ex">➕ الإضافات</span><span>'+nm+'</span><span class="tk-p">+'+fmt(p)+'</span>');
+  });
+  (menu.offers||[]).filter(function(o){return o.active!==false;}).forEach(function(o){
+    var p=(o.sizes&&o.sizes[0])?o.sizes[0].p:0;
+    var nm=o.nameAr||o.name||'';
+    var sub=(o.descAr||o.desc)?'<span class="tk-sub">'+esc(o.descAr||o.desc)+'</span>':'';
+    _slides.push('<span class="tk-h of">🔥 '+esc(o.badge||'عرض')+'</span><span>'+esc(nm)+'</span>'+sub+
+                 (p>0?'<span class="tk-p">'+fmt(p)+' IQD</span>':''));
+  });
+  startTicker();
+}
+function startTicker(){
+  var tk=$('ticker'), el=$('tkSlide');
+  if(_tkTimer){ clearTimeout(_tkTimer); _tkTimer=null; }
+  if(!_slides.length){ tk.classList.add('hide'); return; }
+  tk.classList.remove('hide');
+  _tkIdx=0;
+  el.classList.remove('show');
+  el.innerHTML=_slides[0];
+  void el.offsetWidth;            // reflow so the first fade-in animates
+  loopTicker();
+}
+function loopTicker(){
+  var el=$('tkSlide');
+  var FADE=600, HOLD=_slides.length>1?3400:6000;
+  el.classList.add('show');                       // fade + slide in
+  _tkTimer=setTimeout(function(){
+    if(_slides.length<=1) return;                 // single item: keep it shown
+    el.classList.remove('show');                  // fade out
+    _tkTimer=setTimeout(function(){
+      _tkIdx=(_tkIdx+1)%_slides.length;
+      el.innerHTML=_slides[_tkIdx];
+      void el.offsetWidth;
+      loopTicker();                               // next one fades in
+    }, FADE);
+  }, HOLD);
+}
+
+/* ── render ── */
+var lastMenu=null;
+function renderAll(menu){
+  lastMenu=menu; _hasData=true;
+
+  $('boardTitle').innerHTML = MODE==='screen1'
+    ? '<span class="ar">البيتزا</span><span class="mid">·</span><span class="en">PIZZA</span>'
+    : '<span class="ar">ساندويش وسلطة</span><span class="mid">·</span><span class="en">Sandwich &amp; Salad</span>';
+
+  var wrap=$('fitWrap'); wrap.innerHTML='';
+  var grid=document.createElement('div');
+  var cards=[];
+
+  if(MODE==='screen1'){
+    var pizzas=menu.pizza||[];
+    grid.className='grid '+(pizzas.length<=4?'cols2':pizzas.length<=15?'cols3':'cols4');
+    pizzas.forEach(function(it){cards.push(pizzaCard(it));});
+  } else {
+    var sand=menu.sandwich||[], sal=menu.salad||[];
+    var total=sand.length+sal.length;
+    grid.className='grid '+(total<=4?'cols2':total<=14?'cols3':'cols4');
+    if(sand.length){ cards.push(capRow('SANDWICH','ساندويش')); sand.forEach(function(it){cards.push(foodCard(it));}); }
+    if(sal.length){ cards.push(capRow('SALAD','سلطات')); sal.forEach(function(it){cards.push(foodCard(it));}); }
+  }
+
+  if(!cards.length){ wrap.innerHTML='<div class="empty">— لا توجد أصناف —</div>'; }
+  else{ cards.forEach(function(c){grid.appendChild(c);}); wrap.appendChild(grid); }
+
+  buildTicker(menu);
+  fit();
+  if(document.fonts&&document.fonts.ready) document.fonts.ready.then(fit);
+  setTimeout(fit,300);
+}
+
+/* ── firebase (lazy + self-healing) ── */
+function cache(d){ try{localStorage.setItem(CACHE_KEY,JSON.stringify(d));}catch(e){} }
+function loadCache(){ try{var s=localStorage.getItem(CACHE_KEY); if(s){renderAll(JSON.parse(s)); setOnline(false);}}catch(e){} }
+function loadScript(src){return new Promise(function(res,rej){var s=document.createElement('script');s.src=src;s.async=true;s.onload=res;s.onerror=function(){rej(new Error('x'));};document.head.appendChild(s);});}
+var _fbInit=false,_loading=false;
+function initFirebase(){
+  if(_fbInit||typeof firebase==='undefined')return; _fbInit=true;
+  try{
+    firebase.initializeApp(firebaseConfig);
+    var db=firebase.database();
+    db.ref('.info/connected').on('value',function(s){setOnline(s.val()===true);});
+    db.ref('baltazar/menu').on('value',function(s){var d=s.val(); if(d){renderAll(d);cache(d);}});
+  }catch(e){_fbInit=false;}
+}
+function ensureFirebase(){
+  if(_fbInit)return;
+  if(typeof firebase!=='undefined'){initFirebase();return;}
+  if(_loading)return; _loading=true;
+  loadScript('https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js')
+    .then(function(){return loadScript('https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js');})
+    .then(function(){_loading=false;initFirebase();})
+    .catch(function(){_loading=false;setOnline(false);});
+}
+window.addEventListener('online',ensureFirebase);
+window.addEventListener('offline',function(){ if(!_fbInit) setOnline(false); });
+setInterval(function(){ if(!_fbInit && (navigator.onLine!==false)) ensureFirebase(); },30000);
+
+/* ── boot ── */
+document.body.dataset.screen=MODE;
+setScale(); tickClock(); buildFoodBg(); loadCache(); ensureFirebase();
+</script>
+</body>
+</html>
